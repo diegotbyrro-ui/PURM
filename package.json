@@ -1,0 +1,11 @@
+{
+  "name": "purm-site-crm-hostinger",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm ci --prefix crm --no-audit --no-fund && npm run typecheck --prefix crm && npm run build --prefix crm -- --base=/crm/ && node -e \"const fs=require('node:fs');fs.rmSync('outputs',{recursive:true,force:true});fs.cpSync('dist','outputs',{recursive:true});fs.cpSync('crm/build','outputs/crm',{recursive:true});if(!fs.existsSync('outputs/index.html')||!fs.existsSync('outputs/crm/index.html'))process.exit(1);console.log('OK: site e CRM em outputs/')\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
