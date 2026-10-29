@@ -10,9 +10,11 @@ import FinancePage from './finance/FinancePage';
 import CarlaPage from './finance/CarlaPage';
 import AdminSettings, {type Permission} from './admin/AdminSettings';
 import LeadAlerts from './admin/LeadAlerts';
+import SalesProspector from './ai/SalesProspector';
+import SalesAnalyst from './ai/SalesAnalyst';
 import { money, dateText, shortDate, type Lead, type Stage, type Interaction } from './data';
 
-type Page = 'dashboard' | 'pipeline' | 'clientes' | 'agenda' | 'relatorios' | 'configuracoes' | 'financeiro' | 'carla';
+type Page = 'dashboard' | 'pipeline' | 'clientes' | 'agenda' | 'relatorios' | 'configuracoes' | 'financeiro' | 'carla' | 'prospector' | 'analista';
 type Member = { user_id: string; full_name: string; role: string; branch: string; permissions: Permission[] };
 type Assignee = {user_id:string;full_name:string;branch:string};
 type FormFields = Pick<Lead, 'company_name'|'contact_name'|'whatsapp'|'email'|'origin_city'|'destination_city'|'cargo_description'|'weight_kg'|'pickup_date'|'quote_amount'|'priority'|'temperature'|'stage_id'|'next_contact_at'|'branch'|'notes'> & {assigned_to:string|null};
@@ -21,6 +23,8 @@ const MENU: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   {id:'pipeline', label:'Pipeline comercial', icon:Columns3},
   {id:'clientes', label:'Clientes e cotações', icon:UsersRound},
   {id:'agenda', label:'Agenda', icon:CalendarDays},
+  {id:'prospector', label:'Prospector IA', icon:Search},
+  {id:'analista', label:'IA Analista', icon:Bot},
   {id:'relatorios', label:'Relatórios', icon:ChartNoAxesCombined},
   {id:'financeiro', label:'Financeiro', icon:WalletCards},
   {id:'carla', label:'Secretária', icon:Bot},
@@ -246,6 +250,8 @@ export default function App(){
         {!visibleMenu.some(m=>m.id===page)&&<div className='finance-panel'><h3>Acesso restrito</h3><p>Seu perfil não tem permissão para esta área.</p></div>}
         {page==='financeiro'&&can('finance.view')&&<FinancePage canEdit={can('finance.edit')} secretaryName={secretaryName} onNavigateToCarla={can('secretary.use')?()=>nav('carla'):undefined}/>}
         {page==='carla'&&can('secretary.use')&&<CarlaPage/>}
+        {page==='prospector'&&can('crm.view')&&<SalesProspector stages={stages} existingLeads={leads} branch={member.branch} canEdit={can('crm.edit')} onLeadSaved={()=>void fetchData()}/>}
+        {page==='analista'&&can('crm.view')&&<SalesAnalyst leads={leads} stages={stages} canEdit={can('crm.edit')} onOpenLead={id=>{setDetailId(id);setPage('clientes');}}/>}
         {page==='dashboard'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">VISÃO GERAL</span><h2>Seu comercial em movimento.</h2><p>Uma visão clara das oportunidades, cotações e próximos contatos da PURM.</p></div><button className="primary" onClick={()=>nav('pipeline')}>Abrir pipeline <ArrowUpRight size={17}/></button></section>{metricView}<div className="split"><section className="panel"><h3>Pipeline por etapa</h3><p>Acompanhe onde cada cotação está.</p>{stages.map(s=>{const count=leads.filter(l=>l.stage_id===s.id).length;return <div className="progress-row" key={s.id}><span>{s.name}</span><div><i style={{background:s.color,width:`${Math.max(0,count/Math.max(1,leads.length)*100)}%`}}/></div><strong>{count}</strong></div>;})}</section><section className="panel"><h3>Próximos contatos</h3><p>Não deixe nenhuma oportunidade sem retorno.</p>{leads.filter(l=>l.next_contact_at).sort((a,b)=>String(a.next_contact_at).localeCompare(String(b.next_contact_at))).slice(0,6).map(l=><button className="activity-row" key={l.id} onClick={()=>setDetailId(l.id)}><CalendarClock size={18}/><span><strong>{l.company_name}</strong><small>{shortDate(l.next_contact_at)}</small></span><ChevronRight size={16}/></button>)}{!leads.some(l=>l.next_contact_at)&&<div className="empty">Nenhum retorno agendado.</div>}</section></div></>}
         {page==='pipeline'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">PIPELINE COMERCIAL</span><h2>Oportunidades</h2><p>O mesmo modelo de Kanban do APROVUP, adaptado ao transporte de cargas.</p></div>{can('crm.edit')&&<button className="primary" onClick={()=>openEditor('new')}><Plus size={17}/> Nova cotação</button>}</section>{metricView}{stages.length?board:<div className="panel empty">O pipeline está sem etapas. Revise e execute manualmente o arquivo <code>supabase/stages.sql</code> no projeto PURM.</div>}</>}
         {page==='clientes'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">BASE COMERCIAL</span><h2>Empresas e cotações</h2><p>Consulte as empresas, dados de carga e rotas cadastradas.</p></div>{can('crm.edit')&&<button className="primary" onClick={()=>openEditor('new')}><Plus size={17}/> Novo cadastro</button>}</section><div className="toolbar"><div className="search"><Search size={18}/><input aria-label="Pesquisar clientes" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Pesquisar empresa, origem, destino..."/></div><span className="result-num">{filtered.length} registros</span></div><div className="table-scroll"><table><thead><tr><th>Empresa / Contato</th><th>Rota</th><th>Etapa</th><th>Valor cotado</th><th>Retorno</th><th></th></tr></thead><tbody>{filtered.map(l=><tr key={l.id}><td><strong>{l.company_name}</strong><small>{l.contact_name||'—'}</small></td><td>{l.origin_city||'—'} → {l.destination_city||'—'}</td><td><span className="table-stage" style={{borderLeftColor:stageById.get(l.stage_id)?.color}}>{stageById.get(l.stage_id)?.name||'—'}</span></td><td>{money(l.quote_amount)}</td><td>{shortDate(l.next_contact_at)}</td><td><button className="text-action" onClick={()=>setDetailId(l.id)}>Abrir <ArrowUpRight size={15}/></button></td></tr>)}</tbody></table>{!filtered.length&&<div className="empty">Nenhuma cotação encontrada.</div>}</div></>}
