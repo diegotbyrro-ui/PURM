@@ -4,12 +4,12 @@ import { supabase } from '../supabase';
 import { calculateFinance, categories, cents, dateKey, defaultDraft, numericBR, readStatement, rowFingerprint,
   type FinanceDraft, type FinanceEntry, type FinanceKind, type StatementRow } from './financeCore';
 
-type Props={onNavigateToCarla?:()=>void};
+type Props={onNavigateToCarla?:()=>void;canEdit?:boolean};
 const kindLabel:Record<FinanceKind,string>={income:'Receita',expense:'Despesa',transfer_in:'Entrada entre contas',transfer_out:'Saída entre contas'};
 const todayPeriod=()=>dateKey().slice(0,7);
 const getError=(e:unknown)=>e instanceof Error?e.message:String(e);
 
-export default function FinancePage({onNavigateToCarla}:Props){
+export default function FinancePage({onNavigateToCarla,canEdit=true}:Props){
   const [items,setItems]=useState<FinanceEntry[]>([]);
   const [period,setPeriod]=useState(todayPeriod);
   const [loading,setLoading]=useState(false);
@@ -37,7 +37,7 @@ export default function FinancePage({onNavigateToCarla}:Props){
   const metrics=useMemo(()=>calculateFinance(items,period),[items,period]);
   const filtered=useMemo(()=>items.filter(x=>x.occurrence_date.startsWith(period)),[items,period]);
 
-  async function save(e:FormEvent){e.preventDefault();if(!supabase||loading)return;
+  async function save(e:FormEvent){e.preventDefault();if(!supabase||loading||!canEdit)return;
     if(!draft.description.trim()||draft.amount_cents<=0||draft.amount_cents>1_000_000_000_00){setNotice('Confira a descrição e o valor.');return;}
     const payload={...draft,description:draft.description.trim(),category:draft.category.trim(),account_label:draft.account_label.trim(),
       settled_date:draft.status==='settled'?(draft.settled_date||draft.occurrence_date):null,
@@ -48,7 +48,7 @@ export default function FinancePage({onNavigateToCarla}:Props){
     if(error){setNotice('Não foi possível registrar: '+error.message);return;}
     setNotice('Lançamento registrado com sucesso.');setFormOpen(false);setDraft(defaultDraft());setAmountText('');void reload();
   }
-  async function settle(item:FinanceEntry){if(!supabase||loading)return;
+  async function settle(item:FinanceEntry){if(!supabase||loading||!canEdit)return;
     if(!window.confirm('Confirmar baixa de '+item.description+'?'))return;
     setLoading(true);const {error}=await supabase.from('purm_finance_entries').update({status:'settled',settled_date:dateKey(),cash_effect:item.payment_method!=='Cartão de crédito'}).eq('id',item.id);
     setLoading(false);if(error)setNotice(error.message);else void reload();
@@ -66,7 +66,7 @@ export default function FinancePage({onNavigateToCarla}:Props){
       setPreview(result);setNotice(`${result.length} linhas identificadas. Revise os dados e selecione o que importar.`);
     }catch(error){setNotice('Falha ao ler arquivo: '+getError(error));}
   }
-  async function importRows(){if(!supabase||importing)return;
+  async function importRows(){if(!supabase||importing||!canEdit)return;
     const active=preview.filter(x=>x.selected);if(!active.length){setNotice('Selecione pelo menos uma linha.');return;}
     if(!window.confirm(`Importar ${active.length} lançamento(s) revisado(s) de ${filename}?`))return;
     setImporting(true);let ok=0,duplicados=0;const failures:string[]=[];const occurrence=new Map<string,number>();
@@ -94,7 +94,7 @@ export default function FinancePage({onNavigateToCarla}:Props){
   }
   return <div className="finance-module">
     <section className="hero"><div><span className="eyebrow">FINANCEIRO PURM • BASEADO NO APROVUP</span><h2>Controle financeiro</h2><p>Faturamento, despesas, contas a pagar e receber, fluxo de caixa e importação revisada de extratos.</p></div>
-      <div className="finance-actions"><button className="secondary" onClick={exportCSV}><Download size={16}/> Exportar CSV</button><button className="secondary" onClick={()=>{setImportOpen(v=>!v);setNotice('')}}><FileUp size={16}/> Importar extrato/fatura</button><button className="primary" onClick={()=>{setDraft(defaultDraft());setAmountText('');setFormOpen(true)}}><Plus size={16}/> Novo lançamento</button></div></section>
+      <div className="finance-actions"><button className="secondary" onClick={exportCSV}><Download size={16}/> Exportar CSV</button><button className="secondary" disabled={!canEdit} onClick={()=>{setImportOpen(v=>!v);setNotice('')}}><FileUp size={16}/> Importar extrato/fatura</button><button className="primary" disabled={!canEdit} onClick={()=>{setDraft(defaultDraft());setAmountText('');setFormOpen(true)}}><Plus size={16}/> Novo lançamento</button></div></section>
     <div className="finance-toolbar"><label>Competência <input type="month" value={period} onChange={e=>setPeriod(e.target.value)}/></label><button className="secondary" onClick={()=>void reload()} disabled={loading}><RefreshCw size={15}/> Atualizar</button><span>Valores de faturamento por competência; caixa por data de liquidação</span></div>
     {notice&&<div className="finance-notice" role="status">{notice}</div>}
     <div className="finance-stats">
@@ -108,10 +108,10 @@ export default function FinancePage({onNavigateToCarla}:Props){
       <label>Arquivo CSV, OFX, QFX, QBO, TSV ou TXT<input type="file" accept=".csv,.tsv,.txt,.ofx,.qfx,.qbo,.pdf" onChange={e=>void openFile(e.target.files?.[0]||null)} /></label></div>
       <p className="finance-muted">PDF: suporte em desenvolvimento. PDFs digitalizados precisarão de OCR. Valores e categorias extraídos de extratos podem variar de banco para banco.</p>
       {preview.length>0&&<><div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Usar</th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>{preview.map(r=><tr key={r.index}><td><input type="checkbox" checked={r.selected} onChange={e=>updatePreview(r.index,{selected:e.target.checked})}/></td><td>{r.date}</td><td><input value={r.description} maxLength={220} onChange={e=>updatePreview(r.index,{description:e.target.value})}/></td><td><select value={r.kind} onChange={e=>updatePreview(r.index,{kind:e.target.value as FinanceKind})}>{Object.entries(kindLabel).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></td><td><select value={r.category} onChange={e=>updatePreview(r.index,{category:e.target.value})}>{categories.map(x=><option key={x}>{x}</option>)}</select></td><td><strong>{cents(r.amount_cents)}</strong></td></tr>)}</tbody></table></div>
-      <button className="primary" disabled={importing||!preview.some(x=>x.selected)} onClick={()=>void importRows()}>{importing?'Importando...':`Confirmar ${preview.filter(x=>x.selected).length} lançamento(s)`}</button></>}
+      <button className="primary" disabled={!canEdit||importing||!preview.some(x=>x.selected)} onClick={()=>void importRows()}>{importing?'Importando...':`Confirmar ${preview.filter(x=>x.selected).length} lançamento(s)`}</button></>}
     </section>}
     <section className="finance-panel"><div className="finance-title"><div><h3><WalletCards size={20}/> Lançamentos do mês</h3><p>As baixas e importações são registradas no Supabase com permissões e auditoria.</p></div><strong>{filtered.length} registro(s)</strong></div>
-      <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th>Status</th><th>Valor</th><th>Ação</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id}><td>{x.occurrence_date}</td><td><strong>{x.description}</strong><small>{x.source==='manual'?'Manual':x.source==='secretary'?'Carla':'Importado'}</small></td><td>{x.category}</td><td>{x.account_label}</td><td>{kindLabel[x.kind]}</td><td><span className={'fin-status '+x.status}>{x.status==='settled'?'Baixado':'Pendente'}</span></td><td className={x.kind==='expense'||x.kind==='transfer_out'?'negative':''}>{cents(x.amount_cents)}</td><td>{x.status==='pending'?<button className="finance-link" onClick={()=>void settle(x)} disabled={loading}>Baixar</button>:'—'}</td></tr>)}{!filtered.length&&<tr><td colSpan={8} className="finance-empty">Nenhum lançamento neste mês.</td></tr>}</tbody></table></div>
+      <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th>Status</th><th>Valor</th><th>Ação</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id}><td>{x.occurrence_date}</td><td><strong>{x.description}</strong><small>{x.source==='manual'?'Manual':x.source==='secretary'?'Carla':'Importado'}</small></td><td>{x.category}</td><td>{x.account_label}</td><td>{kindLabel[x.kind]}</td><td><span className={'fin-status '+x.status}>{x.status==='settled'?'Baixado':'Pendente'}</span></td><td className={x.kind==='expense'||x.kind==='transfer_out'?'negative':''}>{cents(x.amount_cents)}</td><td>{x.status==='pending'?<button className="finance-link" onClick={()=>void settle(x)} disabled={loading||!canEdit}>Baixar</button>:'—'}</td></tr>)}{!filtered.length&&<tr><td colSpan={8} className="finance-empty">Nenhum lançamento neste mês.</td></tr>}</tbody></table></div>
     </section>
     <section className="finance-panel finance-carla-tease"><CalendarClock size={20}/><div><h3>Secretária Carla</h3><p>Prepare um lançamento por mensagem, confirme e registre com histórico de auditoria.</p></div>{onNavigateToCarla&&<button className="secondary" onClick={onNavigateToCarla}>Conversar com Carla</button>}</section>
     {formOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setFormOpen(false)}}><section className="modal finance-dialog" role="dialog" aria-modal="true" aria-label="Novo lançamento financeiro"><div className="modal-head"><div><span className="eyebrow">FINANCEIRO</span><h2>Novo lançamento</h2><p>Revisar descrição, competência e impacto no caixa.</p></div><button className="modal-close" onClick={()=>setFormOpen(false)} aria-label="Fechar">×</button></div>
@@ -125,6 +125,6 @@ export default function FinancePage({onNavigateToCarla}:Props){
       <label>Data competência<input type="date" value={draft.occurrence_date} onChange={e=>setDraft({...draft,occurrence_date:e.target.value})}/></label>
       <label>Vencimento<input type="date" value={draft.due_date} onChange={e=>setDraft({...draft,due_date:e.target.value})}/></label>
       <label className="full">Observações<textarea value={draft.notes} maxLength={1500} onChange={e=>setDraft({...draft,notes:e.target.value})}/></label></div>
-      <div className="modal-actions"><button className="secondary" type="button" onClick={()=>setFormOpen(false)}>Cancelar</button><button className="primary" type="submit" disabled={loading}>{loading?'Salvando...':'Registrar lançamento'}</button></div></form></section></div>}
+      <div className="modal-actions"><button className="secondary" type="button" onClick={()=>setFormOpen(false)}>Cancelar</button><button className="primary" type="submit" disabled={loading||!canEdit}>{loading?'Salvando...':'Registrar lançamento'}</button></div></form></section></div>}
   </div>;
 }

@@ -48,12 +48,15 @@ function googleCalendarLink(e:Event){const iso=(s:string)=>new Date(s).toISOStri
  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.title)}&dates=${iso(e.start_at)}/${iso(e.end_at)}&details=${encodeURIComponent(e.notes+'\nCriado na agenda interna PURM. Avisos Google não ativados automaticamente.')}`;
 }
 export default function CarlaPage(){
+ const [identity,setIdentity]=useState<{name:string;avatar_url:string|null}>({name:'Carla',avatar_url:null});
  const [prompt,setPrompt]=useState('');const [proposal,setProposal]=useState<Proposed|null>(null);
  const [amountText,setAmountText]=useState('');
  const [events,setEvents]=useState<Event[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
  const reload=useCallback(async()=>{if(!supabase)return;const {data,error}=await supabase.from('purm_secretary_events').select('*').order('start_at',{ascending:true}).limit(120);
    if(error){setMessage('Agenda interna ainda indisponível: '+error.message);return;}setEvents((data||[]) as Event[]);},[]);
- useEffect(()=>{void reload();},[reload]);
+ useEffect(()=>{void reload();
+  void supabase?.from('purm_secretary_settings').select('name,avatar_url').eq('id',1).maybeSingle().then(({data})=>{if(data)setIdentity(data);});
+ },[reload]);
  const nextEvents=useMemo(()=>events.filter(e=>new Date(e.end_at).getTime()>Date.now()).slice(0,20),[events]);
  function prepare(ev:FormEvent){ev.preventDefault();const parsed=parseCarlaCommand(prompt);setProposal(parsed);if(parsed?.mode==='finance')setAmountText(String(parsed.payload.amount_cents/100).replace('.',','));
    setMessage(parsed?parsed.message:'Não consegui interpretar. Para finanças experimente “Carla, comprei um baú de 20 mil reais”. Para agenda experimente “Agendar reunião dia 30/10 às 14h”. Não fiz nenhuma alteração.');}
@@ -70,8 +73,8 @@ export default function CarlaPage(){
    setProposal(null);setPrompt('');
   }catch(e){setMessage('Não consegui salvar: '+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}}
  return <div className="carla-page">
-   <section className="hero"><div><span className="eyebrow">SECRETÁRIA PURM • CARLA</span><h2>Organização e finanças em conversa.</h2><p>Uma versão reduzida da LIV do APROVUP, com rascunhos de lançamentos e compromissos confirmados por você.</p></div><Bot size={46} color="#2868ff"/></section>
-   <div className="carla-layout"><section className="finance-panel"><div className="carla-header"><span className="carla-avatar"><Bot size={25}/></span><div><h3>Carla</h3><p>Assistente de finanças e agenda • comandos guiados</p></div></div>
+   <section className="hero"><div><span className="eyebrow">SECRETÁRIA PURM • {identity.name}</span><h2>Organização e finanças em conversa.</h2><p>Uma versão reduzida da LIV do APROVUP, com rascunhos de lançamentos e compromissos confirmados por você.</p></div><Bot size={46} color="#2868ff"/></section>
+   <div className="carla-layout"><section className="finance-panel"><div className="carla-header"><span className="carla-avatar">{identity.avatar_url?<img src={identity.avatar_url} alt="Foto da secretária"/>:<Bot size={25}/>}</span><div><h3>{identity.name}</h3><p>Assistente de finanças e agenda • comandos guiados</p></div></div>
     <div className="carla-bubble">Olá! Posso preparar uma despesa, uma receita ou um compromisso. <b>Eu só registro depois da sua confirmação.</b></div>
     <div className="carla-examples"><button onClick={()=>setPrompt('Carla, acabei de comprar um baú de 20 mil reais, registra nas finanças')}>“Comprei um baú de R$ 20 mil”</button><button onClick={()=>setPrompt('Carla, agendar reunião dia 30/10 às 14h com o financeiro')}>“Agendar reunião dia 30/10 às 14h”</button></div>
     <form onSubmit={prepare} className="carla-compose"><textarea value={prompt} maxLength={600} onChange={e=>setPrompt(e.target.value)} placeholder="Carla, acabei de comprar um baú de 20 mil reais..." rows={3}/><button className="primary" disabled={!prompt.trim()||busy}>Preparar ação</button></form>

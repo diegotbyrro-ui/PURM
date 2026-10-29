@@ -14,7 +14,7 @@ export type Lead = {
   origin_city: string; destination_city: string; cargo_description: string;
   weight_kg: number|null; pickup_date: string|null; quote_amount: number|null;
   priority: 'low'|'medium'|'high'; temperature: 'cold'|'warm'|'hot';
-  stage_id: string; next_contact_at: string|null; branch: string; notes: string;
+  stage_id: string; assigned_to?: string|null; next_contact_at: string|null; branch: string; notes: string;
   created_at: string; updated_at: string;
 };
 export type Interaction = { id: string; lead_id: string; kind: string; description: string; created_at: string; created_by: string|null };
