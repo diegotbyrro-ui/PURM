@@ -4,12 +4,12 @@ import { supabase } from '../supabase';
 import { calculateFinance, categories, cents, dateKey, defaultDraft, numericBR, readStatement, rowFingerprint,
   type FinanceDraft, type FinanceEntry, type FinanceKind, type StatementRow } from './financeCore';
 
-type Props={onNavigateToCarla?:()=>void;canEdit?:boolean};
+type Props={onNavigateToCarla?:()=>void;canEdit?:boolean;secretaryName?:string};
 const kindLabel:Record<FinanceKind,string>={income:'Receita',expense:'Despesa',transfer_in:'Entrada entre contas',transfer_out:'Saída entre contas'};
 const todayPeriod=()=>dateKey().slice(0,7);
 const getError=(e:unknown)=>e instanceof Error?e.message:String(e);
 
-export default function FinancePage({onNavigateToCarla,canEdit=true}:Props){
+export default function FinancePage({onNavigateToCarla,canEdit=true,secretaryName='Assistente'}:Props){
   const [items,setItems]=useState<FinanceEntry[]>([]);
   const [period,setPeriod]=useState(todayPeriod);
   const [loading,setLoading]=useState(false);
@@ -111,9 +111,9 @@ export default function FinancePage({onNavigateToCarla,canEdit=true}:Props){
       <button className="primary" disabled={!canEdit||importing||!preview.some(x=>x.selected)} onClick={()=>void importRows()}>{importing?'Importando...':`Confirmar ${preview.filter(x=>x.selected).length} lançamento(s)`}</button></>}
     </section>}
     <section className="finance-panel"><div className="finance-title"><div><h3><WalletCards size={20}/> Lançamentos do mês</h3><p>As baixas e importações são registradas no Supabase com permissões e auditoria.</p></div><strong>{filtered.length} registro(s)</strong></div>
-      <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th>Status</th><th>Valor</th><th>Ação</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id}><td>{x.occurrence_date}</td><td><strong>{x.description}</strong><small>{x.source==='manual'?'Manual':x.source==='secretary'?'Carla':'Importado'}</small></td><td>{x.category}</td><td>{x.account_label}</td><td>{kindLabel[x.kind]}</td><td><span className={'fin-status '+x.status}>{x.status==='settled'?'Baixado':'Pendente'}</span></td><td className={x.kind==='expense'||x.kind==='transfer_out'?'negative':''}>{cents(x.amount_cents)}</td><td>{x.status==='pending'?<button className="finance-link" onClick={()=>void settle(x)} disabled={loading||!canEdit}>Baixar</button>:'—'}</td></tr>)}{!filtered.length&&<tr><td colSpan={8} className="finance-empty">Nenhum lançamento neste mês.</td></tr>}</tbody></table></div>
+      <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th>Status</th><th>Valor</th><th>Ação</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id}><td>{x.occurrence_date}</td><td><strong>{x.description}</strong><small>{x.source==='manual'?'Manual':x.source==='secretary'?secretaryName:'Importado'}</small></td><td>{x.category}</td><td>{x.account_label}</td><td>{kindLabel[x.kind]}</td><td><span className={'fin-status '+x.status}>{x.status==='settled'?'Baixado':'Pendente'}</span></td><td className={x.kind==='expense'||x.kind==='transfer_out'?'negative':''}>{cents(x.amount_cents)}</td><td>{x.status==='pending'?<button className="finance-link" onClick={()=>void settle(x)} disabled={loading||!canEdit}>Baixar</button>:'—'}</td></tr>)}{!filtered.length&&<tr><td colSpan={8} className="finance-empty">Nenhum lançamento neste mês.</td></tr>}</tbody></table></div>
     </section>
-    <section className="finance-panel finance-carla-tease"><CalendarClock size={20}/><div><h3>Secretária Carla</h3><p>Prepare um lançamento por mensagem, confirme e registre com histórico de auditoria.</p></div>{onNavigateToCarla&&<button className="secondary" onClick={onNavigateToCarla}>Conversar com Carla</button>}</section>
+    <section className="finance-panel finance-carla-tease"><CalendarClock size={20}/><div><h3>Secretária {secretaryName}</h3><p>Prepare um lançamento por mensagem, confirme e registre com histórico de auditoria.</p></div>{onNavigateToCarla&&<button className="secondary" onClick={onNavigateToCarla}>Conversar com {secretaryName}</button>}</section>
     {formOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setFormOpen(false)}}><section className="modal finance-dialog" role="dialog" aria-modal="true" aria-label="Novo lançamento financeiro"><div className="modal-head"><div><span className="eyebrow">FINANCEIRO</span><h2>Novo lançamento</h2><p>Revisar descrição, competência e impacto no caixa.</p></div><button className="modal-close" onClick={()=>setFormOpen(false)} aria-label="Fechar">×</button></div>
       <form className="lead-form" onSubmit={e=>void save(e)}><div className="finance-grid"><label className="full">Descrição *<input value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})} required maxLength={220}/></label>
       <label>Tipo<select value={draft.kind} onChange={e=>setDraft({...draft,kind:e.target.value as FinanceKind})}>{Object.entries(kindLabel).map(([k,n])=><option key={k} value={k}>{n}</option>)}</select></label>

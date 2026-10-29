@@ -9,7 +9,7 @@ function errorMessage(value: unknown): string {
   return 'Nao foi possivel completar a solicitacao.';
 }
 
-export default function CarlaAiPanel() {
+export default function CarlaAiPanel({assistantName='Assistente'}:{assistantName?:string}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export default function CarlaAiPanel() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span className="carla-avatar"><Bot size={23}/></span>
-          <div><h3 style={{ marginBottom: 3 }}>Carla IA — conversa com GPT</h3>
+          <div><h3 style={{ marginBottom: 3 }}>{assistantName} — conversa com GPT</h3>
             <p style={{ marginTop: 0 }}>Assistente com respostas naturais, conectada a um backend seguro.</p></div>
         </div>
         <button type="button" className="secondary" disabled={busy || !messages.length} onClick={() => { setMessages([]); setError(''); }}>
@@ -68,18 +68,18 @@ export default function CarlaAiPanel() {
       <div role="log" aria-live="polite" style={{ display: 'grid', gap: 10, maxHeight: 390, minHeight: 130, overflowY: 'auto', marginTop: 14, padding: 12, background: '#f4f7fc', borderRadius: 12 }}>
         {!messages.length && <div style={{ color: '#596b81', lineHeight: 1.65 }}>
           <MessageSquareText size={20}/> Olá! Pergunte algo sobre atendimento, transportes ou organização da PURM.
-          <p>Exemplo: “Carla, me ajude a organizar os próximos contatos comerciais”.</p>
+          <p>Exemplo: “Me ajude a organizar os próximos contatos comerciais”.</p>
         </div>}
         {messages.map((m, index) => <div key={index} style={{ justifySelf: m.role === 'user' ? 'end' : 'start', maxWidth: '90%', whiteSpace: 'pre-wrap', padding: '10px 13px', background: m.role === 'user' ? '#2868ff' : '#fff', color: m.role === 'user' ? '#fff' : '#102b4b', borderRadius: 12, overflowWrap: 'anywhere' }}>
-          <strong style={{ display: 'block', fontSize: 11, opacity: 0.8, marginBottom: 4 }}>{m.role === 'user' ? 'Você' : 'Carla IA'}</strong>
+          <strong style={{ display: 'block', fontSize: 11, opacity: 0.8, marginBottom: 4 }}>{m.role === 'user' ? 'Você' : assistantName}</strong>
           {m.content}
         </div>)}
-        {busy && <div>Carla está preparando a resposta...</div>}
+        {busy && <div>{assistantName} está preparando a resposta...</div>}
       </div>
       <form onSubmit={send} style={{ display: 'flex', alignItems: 'stretch', gap: 10, marginTop: 12 }}>
         <label style={{ flex: 1, minWidth: 0 }}>
-          <span className="sr-only">Mensagem para a Carla</span>
-          <input type="text" required maxLength={1200} value={input} disabled={busy} onChange={e => setInput(e.target.value)} placeholder="Escreva uma pergunta para a Carla..." style={{ width: '100%' }}/>
+          <span className="sr-only">Mensagem para a secretária</span>
+          <input type="text" required maxLength={1200} value={input} disabled={busy} onChange={e => setInput(e.target.value)} placeholder="Escreva uma pergunta para a secretária..." style={{ width: '100%' }}/>
         </label>
         <button type="submit" className="primary" disabled={busy || !input.trim()}><Send size={16}/> Enviar</button>
       </form>

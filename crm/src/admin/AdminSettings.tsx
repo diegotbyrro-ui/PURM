@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Bot, CalendarDays, CheckCircle2, ImageUp, LockKeyhole, MessageCircle, RefreshCw, Save, ShieldCheck, UsersRound } from 'lucide-react';
 import { supabase } from '../supabase';
+import OpenAISettings from '../ai/OpenAISettings';
 
 export type Permission = 'crm.view'|'crm.edit'|'finance.view'|'finance.edit'|'secretary.use'|'settings.manage';
 export type StaffMember = { user_id:string; email:string; full_name:string; role:string; branch:string; phone_e164:string; notify_whatsapp_leads:boolean; permissions:Permission[] };
@@ -14,10 +15,10 @@ export const PERMISSIONS_BY_ROLE: Record<string,Permission[]> = {
   admin: ALL.map(x=>x.id), gestor:['crm.view','crm.edit','finance.view','finance.edit','secretary.use'],
   comercial:['crm.view','crm.edit'], financeiro:['finance.view','finance.edit']
 };
-const defaultIdentity:Identity={name:'Carla',avatar_url:null,whatsapp_number:'',notify_new_leads:false,google_status:'nao_conectado',whatsapp_status:'nao_conectado'};
+const defaultIdentity:Identity={name:'Assistente',avatar_url:null,whatsapp_number:'',notify_new_leads:false,google_status:'nao_conectado',whatsapp_status:'nao_conectado'};
 const errText=(e:unknown)=>e instanceof Error?e.message:String(e);
 
-export default function AdminSettings({fullName,role,branch}: {fullName:string;role:string;branch:string}){
+export default function AdminSettings({fullName,role,branch,onSecretaryNameChange}: {fullName:string;role:string;branch:string;onSecretaryNameChange?:(name:string)=>void}){
  const [staff,setStaff]=useState<StaffMember[]>([]);
  const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
  const [message,setMessage]=useState('');
@@ -60,6 +61,7 @@ export default function AdminSettings({fullName,role,branch}: {fullName:string;r
   setSaving(true);setMessage('');
   const {error}=await supabase.from('purm_secretary_settings').update({name:clean,avatar_url:identity.avatar_url,whatsapp_number:number,notify_new_leads:identity.notify_new_leads}).eq('id',1);
   setSaving(false);
+  if(!error)onSecretaryNameChange?.(clean);
   setMessage(error?'Falha ao salvar identidade: '+error.message:'Identidade interna atualizada. Nome e foto no WhatsApp Business precisam de configuração/aprovação separada pela Meta.');
  }
  async function uploadAvatar(file:File|null){if(!file||!supabase)return;
@@ -97,6 +99,7 @@ export default function AdminSettings({fullName,role,branch}: {fullName:string;r
      <label className="full admin-checkbox"><input type="checkbox" checked={identity.notify_new_leads} onChange={e=>setIdentity(prev=>({...prev,notify_new_leads:e.target.checked}))}/> Preparar alertas de novos leads para WhatsApp (envio ainda desativado)</label>
      <button type="submit" className="primary full" disabled={saving||uploading}><Save size={17}/> Salvar identidade</button>
     </form>
+    <OpenAISettings/>
     <div className="admin-connection"><h3><CalendarDays size={18}/> Google Agenda</h3><span className="admin-status">Não conectado</span><p>Próxima etapa: OAuth 2.0 com consentimento e armazenamento seguro de tokens numa Edge Function do Supabase. Não coloque Client Secret no frontend.</p><a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Abrir Google Cloud → Calendar API</a></div>
     <div className="admin-connection"><h3><MessageCircle size={18}/> WhatsApp Cloud API</h3><span className="admin-status">Não conectado</span><p>Próxima etapa: Meta Business, número autorizado, permissões, webhook verificado e modelos de mensagens para avisos enviados fora da janela de atendimento.</p><a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer">Abrir Meta for Developers</a></div>
     <div className="admin-connection"><h3><LockKeyhole size={18}/> Credenciais protegidas</h3><p>Tokens e segredos serão guardados somente no servidor/Edge Functions. Nenhuma integração externa está disparando mensagens ou criando eventos nesta versão.</p><CheckCircle2 size={18} color="#1d9167"/></div>

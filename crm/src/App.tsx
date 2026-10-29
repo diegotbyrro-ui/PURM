@@ -23,7 +23,7 @@ const MENU: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   {id:'agenda', label:'Agenda', icon:CalendarDays},
   {id:'relatorios', label:'Relatórios', icon:ChartNoAxesCombined},
   {id:'financeiro', label:'Financeiro', icon:WalletCards},
-  {id:'carla', label:'Secretária Carla', icon:Bot},
+  {id:'carla', label:'Secretária', icon:Bot},
   {id:'configuracoes', label:'Configurações', icon:Settings2}
 ];
 const PRIORITY: Record<Lead['priority'],string> = {high:'Alta',medium:'Média',low:'Baixa'};
@@ -46,6 +46,7 @@ function kpis(leads:Lead[],stages:Stage[]){
 }
 
 export default function App(){
+  const [secretaryName,setSecretaryName]=useState('');
   const [session,setSession]=useState<string|null>(null);
   const [member,setMember]=useState<Member|null>(null);
   const [booting,setBooting]=useState(true);
@@ -110,6 +111,12 @@ export default function App(){
     return ()=>data?.subscription.unsubscribe();
   },[checkSession]);
 
+  useEffect(()=>{
+    if(!session||!supabase)return;
+    void supabase.from('purm_secretary_settings').select('name').eq('id',1).maybeSingle()
+      .then(({data})=>{if(data?.name)setSecretaryName(String(data.name));});
+  },[session]);
+  const menuLabel=(id:Page,label:string)=>id==='carla'?(secretaryName?`Secretária ${secretaryName}`:'Secretária'):label;
   const can=(p:Permission)=>member?.role==='admin'||Boolean(member?.permissions?.includes(p));
   const visibleMenu=MENU.filter(item=>{
     if(item.id==='financeiro')return can('finance.view');
@@ -229,22 +236,22 @@ export default function App(){
     <aside className={'sidebar '+(mobileOpen?'mobile-open':'')}>
       <div className="sidebar-brand"><span className="brand-mark"><Truck size={25}/></span><span><b>PURM</b><small>TRANSPORTES E CARGAS</small></span></div>
       <div className="sidebar-title">GESTÃO COMERCIAL</div>
-      <nav>{visibleMenu.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>nav(item.id)} className={'sidebar-link '+(page===item.id?'active':'')}><Icon size={18}/><span>{item.label}</span></button>;})}</nav>
+      <nav>{visibleMenu.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>nav(item.id)} className={'sidebar-link '+(page===item.id?'active':'')}><Icon size={18}/><span>{menuLabel(item.id,item.label)}</span></button>;})}</nav>
       <div className="sidebar-footer"><div className="user-summary"><span className="user-avatar">{member.full_name.slice(0,2).toUpperCase()}</span><div><strong>{member.full_name}</strong><small>{member.role} · {member.branch}</small></div></div><button className="logout" onClick={()=>void logout()}><LogOut size={16}/> Sair</button></div>
     </aside>
     <main className="main-area">
-      <header className="top-header"><button className="mobile-toggle" onClick={()=>setMobileOpen(v=>!v)}>☰</button><div><span className="top-eyebrow">PURM / ÁREA INTERNA</span><h1>{MENU.find(x=>x.id===page)?.label}</h1><p>Gestão comercial de transportes e cotações</p></div><div className="header-actions"><span className="welcome">{member.branch}</span>{can('crm.view')&&<LeadAlerts onOpenLead={id=>{void fetchData().then(()=>{setDetailId(id);setPage('clientes');});}}/>}<button className="icon-button" title="Atualizar" aria-label="Atualizar dados" onClick={()=>void refresh()} disabled={busy}><RefreshCw size={18} className={busy?'spin':''}/></button><span className="header-avatar">{member.full_name.slice(0,1).toUpperCase()}</span></div></header>
+      <header className="top-header"><button className="mobile-toggle" onClick={()=>setMobileOpen(v=>!v)}>☰</button><div><span className="top-eyebrow">PURM / ÁREA INTERNA</span><h1>{menuLabel(page,MENU.find(x=>x.id===page)?.label||'')}</h1><p>Gestão comercial de transportes e cotações</p></div><div className="header-actions"><span className="welcome">{member.branch}</span>{can('crm.view')&&<LeadAlerts onOpenLead={id=>{void fetchData().then(()=>{setDetailId(id);setPage('clientes');});}}/>}<button className="icon-button" title="Atualizar" aria-label="Atualizar dados" onClick={()=>void refresh()} disabled={busy}><RefreshCw size={18} className={busy?'spin':''}/></button><span className="header-avatar">{member.full_name.slice(0,1).toUpperCase()}</span></div></header>
       <div className="content">
         {error&&<div className="error content-error" role="alert">{error}<button aria-label="Dispensar aviso" onClick={()=>setError('')}><X size={16}/></button></div>}
         {!visibleMenu.some(m=>m.id===page)&&<div className='finance-panel'><h3>Acesso restrito</h3><p>Seu perfil não tem permissão para esta área.</p></div>}
-        {page==='financeiro'&&can('finance.view')&&<FinancePage canEdit={can('finance.edit')} onNavigateToCarla={can('secretary.use')?()=>nav('carla'):undefined}/>}
+        {page==='financeiro'&&can('finance.view')&&<FinancePage canEdit={can('finance.edit')} secretaryName={secretaryName} onNavigateToCarla={can('secretary.use')?()=>nav('carla'):undefined}/>}
         {page==='carla'&&can('secretary.use')&&<CarlaPage/>}
         {page==='dashboard'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">VISÃO GERAL</span><h2>Seu comercial em movimento.</h2><p>Uma visão clara das oportunidades, cotações e próximos contatos da PURM.</p></div><button className="primary" onClick={()=>nav('pipeline')}>Abrir pipeline <ArrowUpRight size={17}/></button></section>{metricView}<div className="split"><section className="panel"><h3>Pipeline por etapa</h3><p>Acompanhe onde cada cotação está.</p>{stages.map(s=>{const count=leads.filter(l=>l.stage_id===s.id).length;return <div className="progress-row" key={s.id}><span>{s.name}</span><div><i style={{background:s.color,width:`${Math.max(0,count/Math.max(1,leads.length)*100)}%`}}/></div><strong>{count}</strong></div>;})}</section><section className="panel"><h3>Próximos contatos</h3><p>Não deixe nenhuma oportunidade sem retorno.</p>{leads.filter(l=>l.next_contact_at).sort((a,b)=>String(a.next_contact_at).localeCompare(String(b.next_contact_at))).slice(0,6).map(l=><button className="activity-row" key={l.id} onClick={()=>setDetailId(l.id)}><CalendarClock size={18}/><span><strong>{l.company_name}</strong><small>{shortDate(l.next_contact_at)}</small></span><ChevronRight size={16}/></button>)}{!leads.some(l=>l.next_contact_at)&&<div className="empty">Nenhum retorno agendado.</div>}</section></div></>}
         {page==='pipeline'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">PIPELINE COMERCIAL</span><h2>Oportunidades</h2><p>O mesmo modelo de Kanban do APROVUP, adaptado ao transporte de cargas.</p></div>{can('crm.edit')&&<button className="primary" onClick={()=>openEditor('new')}><Plus size={17}/> Nova cotação</button>}</section>{metricView}{stages.length?board:<div className="panel empty">O pipeline está sem etapas. Revise e execute manualmente o arquivo <code>supabase/stages.sql</code> no projeto PURM.</div>}</>}
         {page==='clientes'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">BASE COMERCIAL</span><h2>Empresas e cotações</h2><p>Consulte as empresas, dados de carga e rotas cadastradas.</p></div>{can('crm.edit')&&<button className="primary" onClick={()=>openEditor('new')}><Plus size={17}/> Novo cadastro</button>}</section><div className="toolbar"><div className="search"><Search size={18}/><input aria-label="Pesquisar clientes" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Pesquisar empresa, origem, destino..."/></div><span className="result-num">{filtered.length} registros</span></div><div className="table-scroll"><table><thead><tr><th>Empresa / Contato</th><th>Rota</th><th>Etapa</th><th>Valor cotado</th><th>Retorno</th><th></th></tr></thead><tbody>{filtered.map(l=><tr key={l.id}><td><strong>{l.company_name}</strong><small>{l.contact_name||'—'}</small></td><td>{l.origin_city||'—'} → {l.destination_city||'—'}</td><td><span className="table-stage" style={{borderLeftColor:stageById.get(l.stage_id)?.color}}>{stageById.get(l.stage_id)?.name||'—'}</span></td><td>{money(l.quote_amount)}</td><td>{shortDate(l.next_contact_at)}</td><td><button className="text-action" onClick={()=>setDetailId(l.id)}>Abrir <ArrowUpRight size={15}/></button></td></tr>)}</tbody></table>{!filtered.length&&<div className="empty">Nenhuma cotação encontrada.</div>}</div></>}
         {page==='agenda'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">ACOMPANHAMENTO</span><h2>Agenda comercial</h2><p>Retornos programados para clientes e solicitações de frete.</p></div></section><section className="panel"><h3>Próximos compromissos</h3>{leads.filter(l=>l.next_contact_at).sort((a,b)=>String(a.next_contact_at).localeCompare(String(b.next_contact_at))).map(l=><button className="agenda-row" key={l.id} onClick={()=>setDetailId(l.id)}><span className={'date-pill '+(new Date(l.next_contact_at!).getTime()<Date.now()?'overdue':'')}><CalendarDays size={17}/>{shortDate(l.next_contact_at)}</span><span><strong>{l.company_name}</strong><small>{l.origin_city||'Origem'} → {l.destination_city||'Destino'} · {l.contact_name||'Contato pendente'}</small></span><ChevronRight size={18}/></button>)}{!leads.some(l=>l.next_contact_at)&&<div className="empty">Nenhum retorno agendado. Defina uma data em uma cotação.</div>}</section></>}
         {page==='relatorios'&&can('crm.view')&&<><section className="hero"><div><span className="eyebrow">PERFORMANCE COMERCIAL</span><h2>Relatórios</h2><p>Indicadores extraídos das cotações cadastradas no CRM.</p></div></section>{metricView}<div className="split"><section className="panel"><h3>Distribuição do funil</h3><div className="report-bars">{stages.map(s=>{const count=leads.filter(l=>l.stage_id===s.id).length;return <div key={s.id} className="bar-row"><div><span>{s.name}</span><strong>{count}</strong></div><div className="bar-rail"><i style={{width:`${count/Math.max(1,leads.length)*100}%`,background:s.color}}/></div></div>;})}</div></section><section className="panel"><h3>Resumo de oportunidades</h3><div className="report-value"><span>Quantidade total</span><strong>{leads.length}</strong></div><div className="report-value"><span>Oportunidades ganhas</span><strong>{metrics.won}</strong></div><div className="report-value"><span>Taxa de ganho (todas as cotações)</span><strong>{leads.length?Math.round(metrics.won/leads.length*100):0}%</strong></div><div className="report-value"><span>Valor de propostas abertas</span><strong>{money(metrics.potential)}</strong></div></section></div></>}
-        {page==='configuracoes'&&can('settings.manage')&&<AdminSettings fullName={member.full_name} role={member.role} branch={member.branch}/>}
+        {page==='configuracoes'&&can('settings.manage')&&<AdminSettings fullName={member.full_name} role={member.role} branch={member.branch} onSecretaryNameChange={setSecretaryName}/>}
       </div>
     </main>
 

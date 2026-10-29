@@ -47,13 +47,19 @@ export default {
     if (limitError) return json({ error: 'Controle de consumo ainda nao habilitado. Execute o SQL V4.' }, 503);
     if (allowed !== true) return json({ error: 'Limite de 6 mensagens por minuto atingido. Tente novamente em breve.' }, 429);
 
-    const secret = Deno.env.get('OPENAI_API_KEY');
+    // Prioriza a chave criptografada no Vault, configurada por administrador na PURM.
+    // Mantem fallback do segredo de ambiente legado para nao interromper a V4.
+    let secret = Deno.env.get('OPENAI_API_KEY') || '';
+    const { data: secureConfig, error: secretError } = await ctx.supabaseAdmin.rpc('purm_ai_secret_v5', { p_action: 'get' });
+    if (!secretError && typeof secureConfig?.key === 'string' && secureConfig.key.startsWith('sk-')) {
+      secret = secureConfig.key;
+    }
     if (!secret) return json({ error: 'A chave OpenAI ainda nao foi configurada nos segredos das Edge Functions.' }, 503);
     const model = Deno.env.get('PURM_OPENAI_MODEL') || 'gpt-4.1-mini';
 
     const { data: settings } = await ctx.supabase.from('purm_secretary_settings')
       .select('name').eq('id', 1).maybeSingle();
-    const name = typeof settings?.name === 'string' ? settings.name.slice(0, 60) : 'Carla';
+    const name = typeof settings?.name === 'string' ? settings.name.slice(0, 60) : 'Assistente';
     const history = normalizeHistory(body.history);
 
     const instructions = [

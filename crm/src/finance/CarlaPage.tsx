@@ -10,8 +10,10 @@ const currencyInSpeech=(v:string)=>{
  const match=v.match(/(?:R\$\s*)?((?:\d{1,3}(?:[. ]\d{3})+|\d+)(?:,\d{1,2})?)\s*(mil|reais|real)?/i);
  if(!match)return null;let centsValue=numericBR(match[1]);if(centsValue===null)return null;if((match[2]||'').toLowerCase()==='mil')centsValue*=1000;return {amount:centsValue,phrase:match[0]};
 };
-export function parseCarlaCommand(text:string,now:Date=new Date()):Proposed|null{
- const input=text.trim().replace(/^carla[,!:\s]*/i,'');
+export function parseCarlaCommand(text:string,now:Date=new Date(),assistantName='Assistente'):Proposed|null{
+ const raw=text.trim();
+ const comma=raw.indexOf(',');
+ const input=comma>0&&comma<65&&raw.slice(0,comma).trim().toLocaleLowerCase('pt-BR')===assistantName.toLocaleLowerCase('pt-BR')?raw.slice(comma+1).trim():raw;
  if(!input)return null;
  const lower=input.toLocaleLowerCase('pt-BR');
  if(/agend|compromisso|reuni[aã]o|marcar hor[aá]rio/.test(lower)){
@@ -35,13 +37,13 @@ export function parseCarlaCommand(text:string,now:Date=new Date()):Proposed|null
    const extracted=currencyInSpeech(input);if(!extracted||extracted.amount<=0)return null;
    const kind= /recebi|fatur|entrada|cliente pagou/.test(lower)?'income':'expense';
    const description=input.replace(/(?:R\$\s*)?(?:\d{1,3}(?:[. ]\d{3})+|\d+)(?:,\d{1,2})?\s*(?:mil|reais|real)?/i,'')
-    .replace(/\b(acabei de|registr(ar|e|a)|nas finan[cç]as|carla|eu|de|uma?|o|a|por favor)\b/gi,'').replace(/\s+/g,' ').trim();
-   const clean=description?description[0].toUpperCase()+description.slice(1):kind==='expense'?'Despesa informada à Carla':'Receita informada à Carla';
+    .replace(/\b(acabei de|registr(ar|e|a)|nas finan[cç]as|eu|de|uma?|o|a|por favor)\b/gi,'').replace(/\s+/g,' ').trim();
+   const clean=description?description[0].toUpperCase()+description.slice(1):kind==='expense'?'Despesa informada à secretária':'Receita informada à secretária';
    const today=dateKey(now);
    return {mode:'finance',message:'Preparei um lançamento financeiro. Confirme os dados para salvar.',payload:{
      description:clean.slice(0,220),kind,amount_cents:extracted.amount,
      category:kind==='income'?'Outras receitas':suggestCategory(clean),account_label:'Conta principal',
-     payment_method:'Pix',occurrence_date:today,due_date:today,settled_date:null,status:'pending',cash_effect:false,source:'secretary',import_fingerprint:null,notes:'Proposto por Carla após comando do usuário; confirmado manualmente.'}};
+     payment_method:'Pix',occurrence_date:today,due_date:today,settled_date:null,status:'pending',cash_effect:false,source:'secretary',import_fingerprint:null,notes:'Proposto pela secretária após comando do usuário; confirmado manualmente.'}};
  }
  return null;
 }
@@ -49,7 +51,7 @@ function googleCalendarLink(e:Event){const iso=(s:string)=>new Date(s).toISOStri
  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.title)}&dates=${iso(e.start_at)}/${iso(e.end_at)}&details=${encodeURIComponent(e.notes+'\nCriado na agenda interna PURM. Avisos Google não ativados automaticamente.')}`;
 }
 export default function CarlaPage(){
- const [identity,setIdentity]=useState<{name:string;avatar_url:string|null}>({name:'Carla',avatar_url:null});
+ const [identity,setIdentity]=useState<{name:string;avatar_url:string|null}>({name:'Assistente',avatar_url:null});
  const [prompt,setPrompt]=useState('');const [proposal,setProposal]=useState<Proposed|null>(null);
  const [amountText,setAmountText]=useState('');
  const [events,setEvents]=useState<Event[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
@@ -59,26 +61,26 @@ export default function CarlaPage(){
   void supabase?.from('purm_secretary_settings').select('name,avatar_url').eq('id',1).maybeSingle().then(({data})=>{if(data)setIdentity(data);});
  },[reload]);
  const nextEvents=useMemo(()=>events.filter(e=>new Date(e.end_at).getTime()>Date.now()).slice(0,20),[events]);
- function prepare(ev:FormEvent){ev.preventDefault();const parsed=parseCarlaCommand(prompt);setProposal(parsed);if(parsed?.mode==='finance')setAmountText(String(parsed.payload.amount_cents/100).replace('.',','));
-   setMessage(parsed?parsed.message:'Não consegui interpretar. Para finanças experimente “Carla, comprei um baú de 20 mil reais”. Para agenda experimente “Agendar reunião dia 30/10 às 14h”. Não fiz nenhuma alteração.');}
+ function prepare(ev:FormEvent){ev.preventDefault();const parsed=parseCarlaCommand(prompt,new Date(),identity.name);setProposal(parsed);if(parsed?.mode==='finance')setAmountText(String(parsed.payload.amount_cents/100).replace('.',','));
+   setMessage(parsed?parsed.message:'Não consegui interpretar. Para finanças experimente “Comprei um baú de 20 mil reais”. Para agenda experimente “Agendar reunião dia 30/10 às 14h”. Não fiz nenhuma alteração.');}
  async function confirm(){if(!supabase||!proposal||busy)return;setBusy(true);setMessage('');try{
    if(proposal.mode==='finance'){
      const p=proposal.payload;if(!p.description.trim()||p.amount_cents<=0)throw new Error('Descrição ou valor inválido.');
      const {error}=await supabase.from('purm_finance_entries').insert({...p,description:p.description.trim()});if(error)throw error;
-     setMessage('Carla: lançamento registrado. Confira na aba Financeiro.');
+     setMessage(identity.name+': lançamento registrado. Confira na aba Financeiro.');
    }else{
      const {error}=await supabase.from('purm_secretary_events').insert({title:proposal.title,notes:proposal.notes,start_at:proposal.start_at,end_at:proposal.end_at,
        remind_day_before:true,remind_hour_before:true,source:'carla'});
-     if(error)throw error;setMessage('Carla: compromisso salvo na agenda interna. Use o link para adicioná-lo ao Google Agenda. Avisos automáticos externos ainda não estão ativados.');await reload();
+     if(error)throw error;setMessage(identity.name+': compromisso salvo na agenda interna. Use o link para adicioná-lo ao Google Agenda. Avisos automáticos externos ainda não estão ativados.');await reload();
    }
    setProposal(null);setPrompt('');
   }catch(e){setMessage('Não consegui salvar: '+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}}
- return <div className="carla-page"><CarlaAiPanel/>
+ return <div className="carla-page"><CarlaAiPanel assistantName={identity.name}/>
    <section className="hero"><div><span className="eyebrow">SECRETÁRIA PURM • {identity.name}</span><h2>Organização e finanças em conversa.</h2><p>Uma versão reduzida da LIV do APROVUP, com rascunhos de lançamentos e compromissos confirmados por você.</p></div><Bot size={46} color="#2868ff"/></section>
    <div className="carla-layout"><section className="finance-panel"><div className="carla-header"><span className="carla-avatar">{identity.avatar_url?<img src={identity.avatar_url} alt="Foto da secretária"/>:<Bot size={25}/>}</span><div><h3>{identity.name}</h3><p>Assistente de finanças e agenda • comandos guiados</p></div></div>
     <div className="carla-bubble">Olá! Posso preparar uma despesa, uma receita ou um compromisso. <b>Eu só registro depois da sua confirmação.</b></div>
-    <div className="carla-examples"><button onClick={()=>setPrompt('Carla, acabei de comprar um baú de 20 mil reais, registra nas finanças')}>“Comprei um baú de R$ 20 mil”</button><button onClick={()=>setPrompt('Carla, agendar reunião dia 30/10 às 14h com o financeiro')}>“Agendar reunião dia 30/10 às 14h”</button></div>
-    <form onSubmit={prepare} className="carla-compose"><textarea value={prompt} maxLength={600} onChange={e=>setPrompt(e.target.value)} placeholder="Carla, acabei de comprar um baú de 20 mil reais..." rows={3}/><button className="primary" disabled={!prompt.trim()||busy}>Preparar ação</button></form>
+    <div className="carla-examples"><button onClick={()=>setPrompt('Comprei um baú de 20 mil reais, registra nas finanças')}>“Comprei um baú de R$ 20 mil”</button><button onClick={()=>setPrompt('Agendar reunião dia 30/10 às 14h com o financeiro')}>“Agendar reunião dia 30/10 às 14h”</button></div>
+    <form onSubmit={prepare} className="carla-compose"><textarea value={prompt} maxLength={600} onChange={e=>setPrompt(e.target.value)} placeholder="Comprei um baú de 20 mil reais..." rows={3}/><button className="primary" disabled={!prompt.trim()||busy}>Preparar ação</button></form>
     {message&&<div role="status" className="finance-notice">{message}</div>}
     {proposal&&<div className="carla-proposal"><h3><ShieldCheck size={18}/> Revisar antes de confirmar</h3>
       {proposal.mode==='finance'?<div className="finance-grid"><label>Descrição<input value={proposal.payload.description} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,description:e.target.value}})}/></label><label>Valor<input value={amountText} onChange={e=>{setAmountText(e.target.value);setProposal({...proposal,payload:{...proposal.payload,amount_cents:Math.max(0,numericBR(e.target.value)||0)}})}}/></label><label>Categoria<input value={proposal.payload.category} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,category:e.target.value}})}/></label><label>Data<input type="date" value={proposal.payload.occurrence_date} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,occurrence_date:e.target.value,due_date:e.target.value}})}/></label><p className="finance-muted full">Valor: <b>{cents(proposal.payload.amount_cents)}</b>. Status inicial: pendente. Não serão registrados pagamentos no banco automaticamente.</p></div>
