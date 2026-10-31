@@ -12,7 +12,7 @@ form.addEventListener('submit',event=>{event.preventDefault();const d=new FormDa
 document.querySelectorAll('dialog .close').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}));
 document.querySelector('#copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(summary.value);status.textContent='Pedido copiado. Agora é só encaminhar à equipe PURM.'}catch{summary.focus();summary.select();status.textContent='Selecione o texto acima e use a opção Copiar do seu dispositivo.'}});
 document.querySelector('#download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([summary.value],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='pedido-de-cotacao-purm.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='Pedido preparado para download.'});
-document.querySelector('#privacy-open').addEventListener('click',()=>document.querySelector('#privacy-dialog').showModal());
+
 
 const dateOptions=document.querySelector('#date-options'),timeOptions=document.querySelector('#time-options');
 const businessNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:'America/Recife'}));

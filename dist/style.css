@@ -32,3 +32,6 @@
 @media(prefers-reduced-motion:reduce){.branch-card,.branch-route,.branch-route svg{transition:none}.branch-route:hover svg{transform:none}}
 
 @media(max-width:760px){.branch-identity img{width:54px;height:54px;padding:5px}}
+
+/* PURM: documentos institucionais e OAuth */
+.footer-bottom .legal-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.footer-bottom .legal-links a{font-size:11px;color:#dce8f8;text-decoration:none}.footer-bottom .legal-links a:hover{color:#80a9ff}.purm-crm-note{font-size:10px;color:#9db1ca;margin:16px 0 0;line-height:1.8;max-width:840px}@media(max-width:720px){.footer-bottom .legal-links{gap:13px}}
