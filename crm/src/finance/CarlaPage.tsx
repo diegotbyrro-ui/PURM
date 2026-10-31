@@ -47,9 +47,6 @@ export function parseCarlaCommand(text:string,now:Date=new Date(),assistantName=
  }
  return null;
 }
-function googleCalendarLink(e:Event){const iso=(s:string)=>new Date(s).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
- return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.title)}&dates=${iso(e.start_at)}/${iso(e.end_at)}&details=${encodeURIComponent(e.notes+'\nCriado na agenda interna PURM. Avisos Google não ativados automaticamente.')}`;
-}
 export default function CarlaPage(){
  const [identity,setIdentity]=useState<{name:string;avatar_url:string|null}>({name:'Assistente',avatar_url:null});
  const [prompt,setPrompt]=useState('');const [proposal,setProposal]=useState<Proposed|null>(null);
@@ -61,6 +58,18 @@ export default function CarlaPage(){
   void supabase?.from('purm_secretary_settings').select('name,avatar_url').eq('id',1).maybeSingle().then(({data})=>{if(data)setIdentity(data);});
  },[reload]);
  const nextEvents=useMemo(()=>events.filter(e=>new Date(e.end_at).getTime()>Date.now()).slice(0,20),[events]);
+ async function syncEvent(e:Event){if(!supabase||busy)return;setBusy(true);setMessage('');
+  try{const {data,error}=await supabase.functions.invoke<{ok?:boolean;error?:string}>('purm-google-calendar',{body:{action:'create',eventId:e.id}});
+    if(error||!data?.ok)throw new Error(data?.error||'Falha na sincronizacao Google.');
+    setMessage('Compromisso sincronizado com Google Agenda.');await reload();}
+  catch(err){setMessage('Google Agenda: '+(err instanceof Error?err.message:String(err)));}finally{setBusy(false);}}
+ async function deleteEvent(e:Event){if(!supabase||busy)return;
+  if(!window.confirm('Excluir definitivamente "'+e.title+'" da agenda PURM e do Google Agenda (se vinculado)?'))return;
+  setBusy(true);setMessage('');try{
+    const {data,error}=await supabase.functions.invoke<{ok?:boolean;error?:string}>('purm-google-calendar',{body:{action:'delete',eventId:e.id,confirm:true}});
+    if(error||!data?.ok)throw new Error(data?.error||'Falha na exclusao.');
+    setMessage('Compromisso excluido apos confirmacao.');await reload();}
+  catch(err){setMessage('Nao foi possivel excluir: '+(err instanceof Error?err.message:String(err)));}finally{setBusy(false);}}
  function prepare(ev:FormEvent){ev.preventDefault();const parsed=parseCarlaCommand(prompt,new Date(),identity.name);setProposal(parsed);if(parsed?.mode==='finance')setAmountText(String(parsed.payload.amount_cents/100).replace('.',','));
    setMessage(parsed?parsed.message:'Não consegui interpretar. Para finanças experimente “Comprei um baú de 20 mil reais”. Para agenda experimente “Agendar reunião dia 30/10 às 14h”. Não fiz nenhuma alteração.');}
  async function confirm(){if(!supabase||!proposal||busy)return;setBusy(true);setMessage('');try{
@@ -69,9 +78,14 @@ export default function CarlaPage(){
      const {error}=await supabase.from('purm_finance_entries').insert({...p,description:p.description.trim()});if(error)throw error;
      setMessage(identity.name+': lançamento registrado. Confira na aba Financeiro.');
    }else{
-     const {error}=await supabase.from('purm_secretary_events').insert({title:proposal.title,notes:proposal.notes,start_at:proposal.start_at,end_at:proposal.end_at,
-       remind_day_before:true,remind_hour_before:true,source:'carla'});
-     if(error)throw error;setMessage(identity.name+': compromisso salvo na agenda interna. Use o link para adicioná-lo ao Google Agenda. Avisos automáticos externos ainda não estão ativados.');await reload();
+     const {data:saved,error}=await supabase.from('purm_secretary_events').insert({title:proposal.title,notes:proposal.notes,start_at:proposal.start_at,end_at:proposal.end_at,
+       remind_day_before:true,remind_hour_before:true,source:'carla'}).select('id').single();
+     if(error||!saved)throw error||new Error('Nao foi possivel salvar compromisso interno.');
+     const synced=await supabase.functions.invoke<{ok?:boolean;error?:string}>('purm-google-calendar',{body:{action:'create',eventId:saved.id}});
+     setMessage(synced.error||!synced.data?.ok
+       ? identity.name+': salvo na agenda interna, mas Google nao sincronizou. Use o botao Sincronizar na lista apos conectar a agenda.'
+       : identity.name+': compromisso salvo na PURM e no Google Agenda, com lembretes 24h e 1h.');
+     await reload();
    }
    setProposal(null);setPrompt('');
   }catch(e){setMessage('Não consegui salvar: '+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}}
@@ -86,11 +100,11 @@ export default function CarlaPage(){
       {proposal.mode==='finance'?<div className="finance-grid"><label>Descrição<input value={proposal.payload.description} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,description:e.target.value}})}/></label><label>Valor<input value={amountText} onChange={e=>{setAmountText(e.target.value);setProposal({...proposal,payload:{...proposal.payload,amount_cents:Math.max(0,numericBR(e.target.value)||0)}})}}/></label><label>Categoria<input value={proposal.payload.category} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,category:e.target.value}})}/></label><label>Data<input type="date" value={proposal.payload.occurrence_date} onChange={e=>setProposal({...proposal,payload:{...proposal.payload,occurrence_date:e.target.value,due_date:e.target.value}})}/></label><p className="finance-muted full">Valor: <b>{cents(proposal.payload.amount_cents)}</b>. Status inicial: pendente. Não serão registrados pagamentos no banco automaticamente.</p></div>
         :<div className="finance-grid"><label className="full">Título<input value={proposal.title} onChange={e=>setProposal({...proposal,title:e.target.value})}/></label><label>Início<input type="datetime-local" value={new Date(new Date(proposal.start_at).getTime()-3*3600000).toISOString().slice(0,16)} onChange={e=>{const d=new Date(e.target.value+':00-03:00');if(!Number.isNaN(d.getTime()))setProposal({...proposal,start_at:d.toISOString(),end_at:new Date(d.getTime()+3600000).toISOString()});}}/></label><label>Duração <input readOnly value="1 hora (V1)"/></label><p className="finance-muted full">Avisos D-1 e H-1 são registrados como preferências. O envio automático exigirá conectar Google e configurar uma rotina segura de notificações.</p></div>}
       <div className="finance-actions"><button className="secondary" onClick={()=>setProposal(null)}>Cancelar</button><button className="primary" disabled={busy} onClick={()=>void confirm()}><CheckCircle2 size={17}/> {busy?'Salvando...':'Confirmar e registrar'}</button></div></div>}
-   </section><section className="finance-panel"><h3><CalendarPlus size={19}/> Compromissos PURM</h3><p>Agenda interna com opção de adicionar cada compromisso ao Google Agenda manualmente.</p>
-     <p className="finance-muted">Preferências registradas por compromisso: 1 dia antes e 1 hora antes. Os envios automáticos ainda não estão ativados.</p>
-     {nextEvents.map(e=><div className="carla-event" key={e.id}><div><strong>{e.title}</strong><span>{new Date(e.start_at).toLocaleString('pt-BR',{timeZone:'America/Recife',dateStyle:'short',timeStyle:'short'})}</span></div><a href={googleCalendarLink(e)} target="_blank" rel="noopener noreferrer">Adicionar ao Google Agenda</a></div>)}
+   </section><section className="finance-panel"><h3><CalendarPlus size={19}/> Compromissos PURM</h3><p>Compromissos da PURM com sincronizacao direta para o Google Agenda autorizado.</p>
+     <p className="finance-muted">Google Agenda: notificacoes popup 24h e 1h antes, se ativadas na conta. WhatsApp continua separado.</p>
+     {nextEvents.map(e=><div className="carla-event" key={e.id}><div><strong>{e.title}</strong><span>{new Date(e.start_at).toLocaleString('pt-BR',{timeZone:'America/Recife',dateStyle:'short',timeStyle:'short'})}</span></div><div className="finance-actions">{e.google_event_id?<span className="finance-muted">Google sincronizado</span>:<button type="button" className="secondary" disabled={busy} onClick={()=>void syncEvent(e)}>Sincronizar Google</button>}<button type="button" className="secondary" disabled={busy} onClick={()=>void deleteEvent(e)}>Excluir</button></div></div>)}
      {!nextEvents.length&&<div className="finance-empty">Nenhum compromisso futuro cadastrado.</div>}
-     <div className="finance-info"><MessageCircle size={16}/><span>Ainda não conectado ao Google: esta versão não cria eventos automaticamente na conta Google, não envia WhatsApp e não executa lembretes em segundo plano. Essas etapas exigem OAuth, servidor/cron e autorização explícita.</span></div>
+     <div className="finance-info"><MessageCircle size={16}/><span>Para criar e excluir eventos no Google, um administrador deve conectar a conta em Configuracoes. Exclusoes exigem confirmacao. WhatsApp e alertas externos nao estao conectados.</span></div>
    </section></div>
  </div>;
 }
