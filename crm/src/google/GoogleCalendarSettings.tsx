@@ -44,7 +44,7 @@ export default function GoogleCalendarSettings() {
   }
   return <div className="admin-connection">
     <h3><CalendarDays size={18}/> Google Agenda da PURM</h3>
-    <span className="admin-status">{status?.connected ? 'Conectado' : 'Nao conectado'}</span>
+    <span className={status?.connected ? 'ai-connected' : 'admin-status'}>{status?.connected ? 'Conectado' : 'Não conectado'}</span>
     <p>{status?.connected ? 'A Secretária pode sincronizar compromissos autorizados com a agenda Google da empresa.' : 'Conecte uma conta Google autorizada. O Client Secret e os tokens permanecem no Supabase.'}</p>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       {!status?.connected ? <button type="button" className="primary" onClick={() => void connect()} disabled={busy}><ExternalLink size={15}/> Conectar Google Agenda</button>
