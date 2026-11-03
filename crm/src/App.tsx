@@ -28,7 +28,7 @@ const MENU: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   {id:'agenda', label:'Agenda', icon:CalendarDays},
   {id:'prospector', label:'Prospector IA', icon:Search},
   {id:'financeiro', label:'Financeiro', icon:WalletCards},
-  {id:'carla', label:'Secretária', icon:Bot},
+  {id:'carla', label:'PURM Secretária IA', icon:Bot},
   {id:'configuracoes', label:'Configurações', icon:Settings2}
 ];
 const PRIORITY: Record<Lead['priority'],string> = {high:'Alta',medium:'Média',low:'Baixa'};
@@ -122,7 +122,7 @@ export default function App(){
     void supabase.from('purm_secretary_settings').select('name').eq('id',1).maybeSingle()
       .then(({data})=>{if(data?.name)setSecretaryName(String(data.name));});
   },[session]);
-  const menuLabel=(id:Page,label:string)=>id==='carla'?(secretaryName?`Secretária ${secretaryName}`:'Secretária'):label;
+  const menuLabel=(id:Page,label:string)=>id==='carla'?'PURM Secretária IA':label;
   const can=(p:Permission)=>member?.role==='admin'||Boolean(member?.permissions?.includes(p));
   const visibleMenu=MENU.filter(item=>{
     if(item.id==='financeiro')return can('finance.view');

@@ -90,7 +90,7 @@ export default function CarlaPage(){
    setProposal(null);setPrompt('');
   }catch(e){setMessage('Não consegui salvar: '+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}}
  return <div className="carla-page"><CarlaAiPanel assistantName={identity.name}/>
-   <section className="hero"><div><span className="eyebrow">SECRETÁRIA PURM • {identity.name}</span><h2>Organização e finanças em conversa.</h2><p>Uma versão reduzida da LIV do APROVUP, com rascunhos de lançamentos e compromissos confirmados por você.</p></div><Bot size={46} color="#2868ff"/></section>
+   <section className="hero"><div><span className="eyebrow">PURM SECRETÁRIA IA • {identity.name}</span><h2>Organização e finanças em conversa.</h2><p>Uma versão reduzida da LIV do APROVUP, com rascunhos de lançamentos e compromissos confirmados por você.</p></div><Bot size={46} color="#2868ff"/></section>
    <div className="carla-layout"><section className="finance-panel"><div className="carla-header"><span className="carla-avatar">{identity.avatar_url?<img src={identity.avatar_url} alt="Foto da secretária"/>:<Bot size={25}/>}</span><div><h3>{identity.name}</h3><p>Assistente de finanças e agenda • comandos guiados</p></div></div>
     <div className="carla-bubble">Olá! Posso preparar uma despesa, uma receita ou um compromisso. <b>Eu só registro depois da sua confirmação.</b></div>
     <div className="carla-examples"><button onClick={()=>setPrompt('Comprei um baú de 20 mil reais, registra nas finanças')}>“Comprei um baú de R$ 20 mil”</button><button onClick={()=>setPrompt('Agendar reunião dia 30/10 às 14h com o financeiro')}>“Agendar reunião dia 30/10 às 14h”</button></div>

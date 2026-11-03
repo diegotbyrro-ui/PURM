@@ -58,8 +58,8 @@ export default function CarlaAiPanel({assistantName='Assistente'}:{assistantName
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span className="carla-avatar"><Bot size={23}/></span>
-          <div><h3 style={{ marginBottom: 3 }}>{assistantName} — conversa com GPT</h3>
-            <p style={{ marginTop: 0 }}>Assistente com respostas naturais, conectada a um backend seguro.</p></div>
+          <div><h3 style={{ marginBottom: 3 }}>PURM Secretária IA</h3>
+            <p style={{ marginTop: 0 }}>Nome definido pela PURM: {assistantName}. Conversa por IA para apoio à equipe.</p></div>
         </div>
         <button type="button" className="secondary" disabled={busy || !messages.length} onClick={() => { setMessages([]); setError(''); }}>
           <Trash2 size={15}/> Limpar conversa
@@ -84,7 +84,7 @@ export default function CarlaAiPanel({assistantName='Assistente'}:{assistantName
         <button type="submit" className="primary" disabled={busy || !input.trim()}><Send size={16}/> Enviar</button>
       </form>
       {error && <div className="finance-notice" role="alert" style={{ marginTop: 10 }}>
-        {error}. Confirme a função purm-carla-ai e o segredo OPENAI_API_KEY no Supabase.
+        {error}. Verifique a função de conversa no Supabase. A chave OpenAI fica protegida no Vault.
       </div>}
       <p className="finance-muted" style={{ marginTop: 12, display: 'flex', alignItems: 'start', gap: 7 }}>
         <ShieldCheck size={16} style={{ flexShrink: 0 }}/>

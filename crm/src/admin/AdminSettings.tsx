@@ -92,10 +92,10 @@ export default function AdminSettings({fullName,role,branch,onSecretaryNameChang
      <button className="primary full" disabled={saving}><Save size={17}/>{saving?'Salvando...':'Salvar acesso e permissões'}</button>
     </form>
    </section>
-   <section className="panel"><h3><Bot size={19}/> Identidade da Secretária</h3><p>Nome e imagem usados dentro da PURM. A foto e o nome visíveis no WhatsApp Business dependem de aprovação e atualização do perfil na Meta.</p>
+   <section className="panel"><h3><Bot size={19}/> Identidade da PURM Secretária IA</h3><p>Nome e imagem usados dentro da PURM. A foto e o nome visíveis no WhatsApp Business dependem de aprovação e atualização do perfil na Meta.</p>
     <form onSubmit={saveIdentity} className="finance-grid">
      <div className="admin-avatar full">{identity.avatar_url?<img src={identity.avatar_url} alt="Foto da Secretária"/>:<Bot size={34}/>}<label className="secondary"><ImageUp size={16}/>{uploading?'Enviando...':'Enviar foto (até 2 MB)'}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploading} onChange={e=>{void uploadAvatar(e.target.files?.[0]||null);e.currentTarget.value='';}}/></label></div>
-     <label className="full">Nome da Secretária<input minLength={2} maxLength={60} required value={identity.name} onChange={e=>setIdentity(prev=>({...prev,name:e.target.value}))}/></label>
+     <label className="full">Nome da assistente (definido pela PURM)<input minLength={2} maxLength={60} required value={identity.name} onChange={e=>setIdentity(prev=>({...prev,name:e.target.value}))}/></label>
      <label className="full">Número WhatsApp Business da PURM (DDI + DDD)<input type="tel" placeholder="5582999999999" value={identity.whatsapp_number} onChange={e=>setIdentity(prev=>({...prev,whatsapp_number:e.target.value}))}/></label>
      <label className="full admin-checkbox"><input type="checkbox" checked={identity.notify_new_leads} onChange={e=>setIdentity(prev=>({...prev,notify_new_leads:e.target.checked}))}/> Preparar alertas de novos leads para WhatsApp (envio ainda desativado)</label>
      <button type="submit" className="primary full" disabled={saving||uploading}><Save size={17}/> Salvar identidade</button>
