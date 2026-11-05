@@ -46,3 +46,17 @@
   .branch-details { padding:24px; }
   .branch-route { margin-top:20px; padding:13px 15px; }
 }
+/* PURM MATRIZ PE R2: tres cards lado a lado, incluindo desktop com zoom. */
+@media (min-width:900px) {
+  .branches.wrap { width:min(1440px,calc(100% - 80px)); }
+  .branches-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  .branches .branch-heading { padding:22px 20px 20px; }
+  .branches .branch-identity { margin-bottom:20px; }
+  .branches .branch-identity img { width:54px; height:54px; }
+  .branches .branch-card h3 { font-size:clamp(38px,3.7vw,55px); }
+  .branches .branch-city { min-height:36px; font-size:11px; }
+  .branches .branch-state-art { font-size:105px; right:10px; }
+  .branches .branch-map { height:235px; margin:0 14px; }
+  .branches .branch-details { padding:23px 20px 24px; }
+  .branches .branch-route { margin-top:20px; padding:13px 14px; }
+}
