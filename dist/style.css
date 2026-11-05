@@ -35,3 +35,14 @@
 
 /* PURM: documentos institucionais e OAuth */
 .footer-bottom .legal-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.footer-bottom .legal-links a{font-size:11px;color:#dce8f8;text-decoration:none}.footer-bottom .legal-links a:hover{color:#80a9ff}.purm-crm-note{font-size:10px;color:#9db1ca;margin:16px 0 0;line-height:1.8;max-width:840px}@media(max-width:720px){.footer-bottom .legal-links{gap:13px}}
+/* PURM MATRIZ PE R1: 3 cards em telas largas, preservando o layout responsivo original. */
+@media (min-width:1101px) {
+  .branches-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+  .branch-heading { padding:24px 24px 22px; }
+  .branch-card h3 { font-size:clamp(44px,3.8vw,57px); }
+  .branch-city { min-height:42px; }
+  .branch-state-art { font-size:120px; right:12px; }
+  .branch-map { height:240px; margin:0 16px; }
+  .branch-details { padding:24px; }
+  .branch-route { margin-top:20px; padding:13px 15px; }
+}
