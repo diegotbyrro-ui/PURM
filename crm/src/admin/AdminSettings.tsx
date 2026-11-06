@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Bot, CheckCircle2, ImageUp, LockKeyhole, MessageCircle, RefreshCw, Save, ShieldCheck, UsersRound } from 'lucide-react';
+import { Bot, CheckCircle2, ImageUp, LockKeyhole, RefreshCw, Save, ShieldCheck, UsersRound } from 'lucide-react';
 import { supabase } from '../supabase';
 import OpenAISettings from '../ai/OpenAISettings';
 import GoogleCalendarSettings from '../google/GoogleCalendarSettings';
+import WhatsAppSettings from './WhatsAppSettings';
 
 export type Permission = 'crm.view'|'crm.edit'|'finance.view'|'finance.edit'|'secretary.use'|'settings.manage';
 export type StaffMember = { user_id:string; email:string; full_name:string; role:string; branch:string; phone_e164:string; notify_whatsapp_leads:boolean; permissions:Permission[] };
@@ -102,7 +103,7 @@ export default function AdminSettings({fullName,role,branch,onSecretaryNameChang
     </form>
     <OpenAISettings/>
     <GoogleCalendarSettings/>
-    <div className="admin-connection"><h3><MessageCircle size={18}/> WhatsApp Cloud API</h3><span className="admin-status">Não conectado</span><p>Próxima etapa: Meta Business, número autorizado, permissões, webhook verificado e modelos de mensagens para avisos enviados fora da janela de atendimento.</p><a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer">Abrir Meta for Developers</a></div>
+    <WhatsAppSettings/>
     <div className="admin-connection"><h3><LockKeyhole size={18}/> Credenciais protegidas</h3><p>Tokens e segredos serão guardados somente no servidor/Edge Functions. Nenhuma integração externa está disparando mensagens ou criando eventos nesta versão.</p><CheckCircle2 size={18} color="#1d9167"/></div>
    </section>
   </div>
